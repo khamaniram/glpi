@@ -2183,10 +2183,6 @@ class Search {
             </button>";
          if ($p['showbookmark'] || $p['showreset']) {
             if ($p['showbookmark']) {
-               //TODO: change that!
-               Ajax::createIframeModalWindow('loadbookmark',
-                                       SavedSearch::getSearchURL() . "?action=load&type=" . SavedSearch::SEARCH,
-                                       ['title'         => __('Load a saved search')]);
                SavedSearch::showSaveButton(
                   SavedSearch::SEARCH,
                   $itemtype,
