@@ -552,7 +552,7 @@ echo "<head>";
 echo "<meta charset='utf-8'>";
 echo "<meta http-equiv='Content-Script-Type' content='text/javascript'>";
 echo "<meta http-equiv='Content-Style-Type' content='text/css'>";
-echo "<title>Setup GLPI</title>";
+echo "<title>Setup Graphoun Helpdesk</title>";
 //JS
 echo Html::script("public/lib/base.js");
 // CSS

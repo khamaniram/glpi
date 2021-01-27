@@ -2829,6 +2829,7 @@ a.icon_nav_move {
    margin: 0;
    padding: 38px 0;
    text-align: center;
+   height:240px;
 }
 #logo_login img {
    display: block; /* Prevent whitespace below element */
@@ -3232,11 +3233,14 @@ ul#menu {
 
 #header #c_logo {
    position: absolute;
-   z-index: 1000;
-   width: 100px;
-   height: 55px;
-   float: left;
-   background: url("../pics/fd_logo.png") 0 0 repeat-x;
+    z-index: 1000;
+    width: 69px;
+    height: 69px;
+    float: left;
+    margin-top: -9px;
+    background-size: 69px 69px;
+    background-repeat: no-repeat;
+    background-image: url(../pics/logos/pinterest_profile_image.png);
 
    a {
       display: block;

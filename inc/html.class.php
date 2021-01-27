@@ -57,13 +57,13 @@ class Html {
    static function clean($value, $striptags = true, $keep_bad = 2) {
       $value = Html::entity_decode_deep($value);
 
-      // Change <email@domain> to email@domain so it is not removed by htmLawed
-      $regex = "/(<[^>]+?@[^;]+?>)/";
-      $value = preg_replace_callback($regex, function($matches) {
-         return substr($matches[1], 1, (strlen($matches[1]) - 2));
-      }, $value);
-
-      // Clean MS office tags
+ // Change <email@domain> to email@domain so it is not removed by htmLawed
+ $regex = "/(<[^>]+?@[^;]+?>)/";
+ $value = preg_replace_callback($regex, function($matches) {
+    return substr($matches[1], 1, (strlen($matches[1]) - 2));
+ }, $value);      
+ 
+ // Clean MS office tags
       $value = str_replace(["<![if !supportLists]>", "<![endif]>"], '', $value);
 
       if ($striptags) {
@@ -1221,7 +1221,7 @@ class Html {
       // Start the page
       echo "<!DOCTYPE html>\n";
       echo "<html lang=\"{$CFG_GLPI["languages"][$_SESSION['glpilanguage']][3]}\">";
-      echo "<head><title>GLPI - ".$title."</title>";
+      echo "<head><title>Graphoun - ".$title."</title>";
       echo "<meta charset=\"utf-8\">";
 
       //prevent IE to turn into compatible mode...
@@ -1475,17 +1475,7 @@ JAVASCRIPT;
    static function getMenuInfos() {
       global $CFG_GLPI;
 
-      $menu = [
-         'assets' => [
-            'title' => __('Assets'),
-            'types' => array_merge([
-               'Computer', 'Monitor', 'Software',
-               'NetworkEquipment', 'Peripheral', 'Printer',
-               'CartridgeItem', 'ConsumableItem', 'Phone',
-               'Rack', 'Enclosure', 'PDU', 'PassiveDCEquipment'
-            ], $CFG_GLPI['devices_in_menu']),
-            'default' => '/front/dashboard_assets.php'
-         ],
+      $menu = [        
          'helpdesk' => [
             'title' => __('Assistance'),
             'types' => [
@@ -1494,23 +1484,7 @@ JAVASCRIPT;
             ],
             'default' => '/front/dashboard_helpdesk.php'
          ],
-         'management' => [
-            'title' => __('Management'),
-            'types' => [
-               'SoftwareLicense','Budget', 'Supplier', 'Contact', 'Contract',
-               'Document', 'Line', 'Certificate', 'Datacenter', 'Cluster', 'Domain',
-               'Appliance'
-            ]
-         ],
-         'tools' => [
-            'title' => __('Tools'),
-            'types' => [
-               'Project', 'Reminder', 'RSSFeed', 'KnowbaseItem',
-               'ReservationItem', 'Report', 'MigrationCleaner',
-               'SavedSearch', 'Impact'
-            ]
-         ],
-         'plugins' => [
+        'plugins' => [
             'title' => _n('Plugin', 'Plugins', Session::getPluralNumber()),
             'types' => []
          ],
@@ -1757,10 +1731,11 @@ JAVASCRIPT;
       $FOOTER_LOADED = true;
       echo "</main>"; // end of "main role='main'"
 
-      echo "<footer role='contentinfo' id='footer'>";
-      echo "<table role='presentation'><tr>";
+    
 
       if ($_SESSION['glpi_use_mode'] == Session::DEBUG_MODE) { // mode debug
+         echo "<footer role='contentinfo' id='footer'>";
+         echo "<table role='presentation'><tr>";
          echo "<td class='left'><span class='copyright'>";
          $timedebug = sprintf(_n('%s second', '%s seconds', $TIMER_DEBUG->getTime()),
                               $TIMER_DEBUG->getTime());
@@ -1770,30 +1745,20 @@ JAVASCRIPT;
          }
          echo $timedebug;
          echo "</span></td>";
+         $currentVersion = preg_replace('/^((\d+\.?)+).*$/', '$1', GLPI_VERSION);
+         $foundedNewVersion = array_key_exists('founded_new_version', $CFG_GLPI)
+            ? $CFG_GLPI['founded_new_version']
+            : '';
+         echo "</tr></table></footer>";
       }
 
-      $currentVersion = preg_replace('/^((\d+\.?)+).*$/', '$1', GLPI_VERSION);
-      $foundedNewVersion = array_key_exists('founded_new_version', $CFG_GLPI)
-         ? $CFG_GLPI['founded_new_version']
-         : '';
-      if (!empty($foundedNewVersion) && version_compare($currentVersion, $foundedNewVersion, '<')) {
-         echo "<td class='copyright'>";
-         $latest_version = "<a href='http://www.glpi-project.org' target='_blank' title=\""
-             . __s('You will find it on the GLPI-PROJECT.org site.')."\"> "
-             . $foundedNewVersion
-             . "</a>";
-         printf(__('A new version is available: %s.'), $latest_version);
-
-         echo "</td>";
-      }
-      echo "<td class='right'>" . self::getCopyrightMessage() . "</td>";
-      echo "</tr></table></footer>";
 
       if ($CFG_GLPI['maintenance_mode']) { // mode maintenance
          echo "<div id='maintenance-float'>";
-         echo "<a href='#see_maintenance'>GLPI MAINTENANCE MODE</a>";
+         echo "<a href='#see_maintenance'>Graphoun Maintenance Mode</a>";
          echo "</div>";
       }
+      
       self::displayDebugInfos();
       self::loadJavascript();
 
@@ -1980,11 +1945,6 @@ JAVASCRIPT;
       $FOOTER_LOADED = true;
 
       echo "</main>"; // end of "main role='main'"
-
-      echo "<footer role='contentinfo' id='footer'>";
-      echo "<table role='presentation' width='100%'><tr><td class='right'>" . self::getCopyrightMessage(false);
-      echo "</td></tr></table></footer>";
-
       self::displayDebugInfos();
       echo "</body></html>";
       self::loadJavascript();
@@ -2046,7 +2006,6 @@ JAVASCRIPT;
       if (!isCommandLine()) {
          echo "</div></main>";
 
-         echo "<div id='footer-login'>" . self::getCopyrightMessage(false) . "</div>";
          self::loadJavascript();
          echo "</body></html>";
       }
@@ -6453,8 +6412,8 @@ JAVASCRIPT;
     * @return string HTML copyright
     */
    static function getCopyrightMessage($withVersion = true) {
-      $message = "<a href=\"http://glpi-project.org/\" title=\"Powered by Teclib and contributors\" class=\"copyright\">";
-      $message .= "GLPI ";
+      $message = "<a href=\"http://glpi-project.org/\" class=\"copyright\">";
+      $message .= "Graphoun ";
       // if required, add GLPI version (eg not for login page)
       if ($withVersion) {
           $message .= GLPI_VERSION . " ";
