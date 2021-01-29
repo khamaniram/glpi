@@ -107,7 +107,6 @@ class Config extends CommonDBTM {
 
       $ong = [];
       $this->addStandardTab(__CLASS__, $ong, $options);
-      $this->addStandardTab('GLPINetwork', $ong, $options);
       $this->addStandardTab('Log', $ong, $options);
 
       return $ong;

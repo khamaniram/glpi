@@ -1500,7 +1500,7 @@ JAVASCRIPT;
             'types' => [
                'CommonDropdown', 'CommonDevice', 'Notification',
                'SLM', 'Config', 'FieldUnicity', 'CronTask', 'Auth',
-               'MailCollector', 'Link', 'Plugin'
+               'MailCollector', 'Link'
             ]
          ],
 
