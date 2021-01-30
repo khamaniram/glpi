@@ -692,7 +692,7 @@ class Config extends CommonDBTM {
       echo "<tr class='tab_bg_2'>";
       echo "<td> " . __('Action when a user is deleted from the LDAP directory') . "</td><td>";
       AuthLDAP::dropdownUserDeletedActions($CFG_GLPI["user_deleted_ldap"]);
-      echo "</td><td> " . __('GLPI server time zone') . "</td><td>";
+      echo "</td><td> " . __('Graphoun server time zone') . "</td><td>";
       Dropdown::showGMT("time_offset", $CFG_GLPI["time_offset"]);
       echo "</td></tr>";
 

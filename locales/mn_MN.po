@@ -20056,7 +20056,7 @@ msgid "Action when a user is deleted from the LDAP directory"
 msgstr "Хэрэглэгчийг LDAP директороос устгасан үед авах арга хэмжээ"
 
 #: inc/config.class.php:696
-msgid "GLPI server time zone"
+msgid "Graphoun server time zone"
 msgstr "GLPI серверийн цагийн бүс"
 
 #: inc/config.class.php:738 install/install.php:216

@@ -19793,7 +19793,7 @@ msgid "Action when a user is deleted from the LDAP directory"
 msgstr "Händelse när en användare raderas från LDAP-katalogen"
 
 #: inc/config.class.php:696
-msgid "GLPI server time zone"
+msgid "Graphoun server time zone"
 msgstr "GLPI tidszon för server"
 
 #: inc/config.class.php:738 install/install.php:216

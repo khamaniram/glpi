@@ -19447,7 +19447,7 @@ msgid "Action when a user is deleted from the LDAP directory"
 msgstr "사용자의 동작이 LDAP 디렉토리에서 삭제되었습니다"
 
 #: inc/config.class.php:696
-msgid "GLPI server time zone"
+msgid "Graphoun server time zone"
 msgstr "GLPI 서버 표준시간대"
 
 #: inc/config.class.php:738 install/install.php:216

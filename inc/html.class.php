@@ -1372,7 +1372,7 @@ class Html {
 
       echo Html::css('css/print.css', ['media' => 'print']);
       echo "<link rel='shortcut icon' type='images/x-icon' href='".
-             $CFG_GLPI["root_doc"]."/pics/favicon.ico' >\n";
+             $CFG_GLPI["root_doc"]."/pics/favicon.png' >\n";
 
       // Add specific css for plugins
       if (isset($PLUGIN_HOOKS['add_css']) && count($PLUGIN_HOOKS['add_css'])) {

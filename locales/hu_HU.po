@@ -19828,7 +19828,7 @@ msgid "Action when a user is deleted from the LDAP directory"
 msgstr "Művelet könyvtárból törléskor"
 
 #: inc/config.class.php:696
-msgid "GLPI server time zone"
+msgid "Graphoun server time zone"
 msgstr "GLPI szerver időzónája"
 
 #: inc/config.class.php:738 install/install.php:216

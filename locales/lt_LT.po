@@ -20459,7 +20459,7 @@ msgid "Action when a user is deleted from the LDAP directory"
 msgstr "Veiksmai, kai vartotojas yra pašalintas iš LDAP katalogo"
 
 #: inc/config.class.php:696
-msgid "GLPI server time zone"
+msgid "Graphoun server time zone"
 msgstr "GLPI serverio laiko zona"
 
 #: inc/config.class.php:738 install/install.php:216

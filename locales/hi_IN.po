@@ -19873,7 +19873,7 @@ msgstr ""
 "जब कोई उपयोगकर्ता एलडीएपी निर्देशिका से हटा दिया जाता है तो कार्रवाई करें"
 
 #: inc/config.class.php:696
-msgid "GLPI server time zone"
+msgid "Graphoun server time zone"
 msgstr "जीएलपीआई सर्वर समय क्षेत्र"
 
 #: inc/config.class.php:738 install/install.php:216
