@@ -234,12 +234,32 @@ class NotificationTarget extends CommonDBChild {
    }
 
    /**
+    * Get a unique message id.
+    *
     * @since 0.84
     *
-    * @return message id for notification
-   **/
+    * @return string
+    */
    function getMessageID() {
-      return '';
+      if ($this->obj instanceof CommonDBTM) {
+         return sprintf(
+            'GLPI_%s-%s-%s.%s.%s@%s',
+            Config::getUuid('notification'),
+            $this->obj->getType(),
+            $this->obj->getField('id'),
+            time(),
+            rand(),
+            php_uname('n')
+         );
+      }
+
+      return sprintf(
+         'GLPI_%s.%s.%s@%s',
+         Config::getUuid('notification'),
+         time(),
+         rand(),
+         php_uname('n')
+      );
    }
 
 

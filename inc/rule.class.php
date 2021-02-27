@@ -586,8 +586,8 @@ class Rule extends CommonDBTM {
          case 'move_rule' :
             $input = $ma->getInput();
             $values = [
-               'after'  => __('After'),
-               'before' => __('Before')
+               RuleCollection::MOVE_AFTER  => __('After'),
+               RuleCollection::MOVE_BEFORE => __('Before')
             ];
             Dropdown::showFromArray('move_type', $values, ['width' => '20%']);
 
@@ -2417,7 +2417,7 @@ class Rule extends CommonDBTM {
 
          switch ($action['type']) {
             case "dropdown" :
-               if ($type=='defaultfromuser' || $type=='fromuser' || $type=='fromitem') {
+               if ($type=='defaultfromuser' || $type=='fromuser' || $type=='fromitem' || $type=='firstgroupfromuser') {
                   return Dropdown::getYesNo($value);
                }
 
@@ -3227,6 +3227,6 @@ class Rule extends CommonDBTM {
 
       $input = Toolbox::addslashes_deep($input);
 
-      return parent::prepareInputForClone($input);
+      return $input;
    }
 }

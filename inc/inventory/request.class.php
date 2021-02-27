@@ -35,6 +35,7 @@ namespace Glpi\Inventory;
 use DOMDocument;
 use DOMElement;
 use Toolbox;
+use Unmanaged;
 
 /**
  * Handle inventory request
@@ -73,21 +74,8 @@ class Request
    /** @var Inventory */
    private $inventory;
 
-   /**
-    * @param null|mixed $data Request contents
-    * @param integer    $mode One of self::*_MODE
-    *
-    * @return void
-    */
-   public function __construct($data = null, $mode = null) {
-      if ($mode !== null) {
-         $this->setMode($mode);
-      }
-      $this->compression = self::COMPRESS_NONE;
-
-      if (null !== $data) {
-          return $this->handleRequest($data);
-      }
+   public function __construct() {
+      $this->handleContentType($_SERVER['CONTENT_TYPE'] ?? false);
    }
 
    /**
@@ -402,13 +390,13 @@ class Request
    }
 
     /**
-     * Detect compression algorithm from Content-Type header
+     * Handle Content-Type header
      *
      * @param string $type Content type
      *
      * @return void
      */
-   public function setCompression($type) {
+   public function handleContentType($type) {
       switch (strtolower($type)) {
          case 'application/x-compress-zlib':
             $this->compression = self::COMPRESS_ZLIB;
@@ -417,13 +405,15 @@ class Request
             $this->compression = self::COMPRESS_GZIP;
             break;
          case 'application/xml':
-            $this->setMode(self::XML_MODE);
             $this->compression = self::COMPRESS_NONE;
+            $this->setMode(self::XML_MODE);
             break;
          case 'application/json':
+            $this->setMode(self::JSON_MODE);
+            $this->compression = self::COMPRESS_NONE;
+            break;
          case 'text/plain': //probably JSON
          default:
-            $this->setMode(self::JSON_MODE);
             $this->compression = self::COMPRESS_NONE;
             break;
       }
@@ -444,13 +434,35 @@ class Request
     * @return array
     */
    public function getInventoryStatus(): array {
-      $item = $this->inventory->getItem();
-      return [
-         'deviceid' => $this->deviceid,
-         'itemtype' => $item->getTypeName(),
-         'items_id' => $item->getID(),
-         'metadata' => $this->inventory->getMetadata()
+      $items = $this->inventory->getItems();
+      $status = [
+         'metadata' => $this->inventory->getMetadata(),
+         'items'    => $items
       ];
+
+      if (count($items) == 1) {
+         $item = $items[0];
+         $status += [
+            'itemtype' => $item->getType(),
+            'items_id' => $item->fields['id']
+         ];
+      } else if (count($items)) {
+         // Defines 'itemtype' only if all items has same type
+         $itemtype = null;
+         foreach ($items as $item) {
+            if ($itemtype === null && $item->getType() != Unmanaged::class) {
+               $itemtype = $item->getType();
+            } else if ($itemtype !== $item->getType()) {
+               $itemtype = false;
+               break;
+            }
+         }
+         if ($itemtype) {
+            $status['itemtype'] = $itemtype;
+         }
+      }
+
+      return $status;
    }
 
    public function getInventory(): Inventory {

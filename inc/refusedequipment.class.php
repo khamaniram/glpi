@@ -34,6 +34,8 @@ if (!defined('GLPI_ROOT')) {
    die("Sorry. You can't access this file directly");
 }
 
+use Glpi\Inventory\Request;
+
 /**
  * Equipments refused from inventory
  */
@@ -237,5 +239,36 @@ class RefusedEquipment extends CommonDBTM {
 
    static function canPurge() {
       return static::canUpdate();
+   }
+
+   /**
+    * Handle inventory request, and returns redirection url
+    *
+    * @return string
+    */
+   public function handleInventoryRequest(Request $request) {
+      $status = $request->getInventoryStatus();
+
+      if ($status['itemtype'] === RefusedEquipment::class) {
+         Session::addMessageAfterRedirect(
+            __('Inventory is still refused.')
+         );
+         return $this->getSearchURL();
+      } else {
+         $this->delete(['id' => $this->fields['id']], true);
+         Session::addMessageAfterRedirect(
+            __('Inventory is successful, refused entry log has been removed.')
+         );
+
+         $item = new $status['itemtype'];
+         if (isset($status['items_id'])) {
+            $item->getFromDB($status['items_id']);
+            $redirect_url = $item->getLinkURL();
+         } else {
+            $redirect_url = $item->getSearchURL();
+         }
+
+         return $redirect_url;
+      }
    }
 }

@@ -35,9 +35,7 @@ use Glpi\Inventory\Request;
 include ('../inc/includes.php');
 
 $inventory_request = new Request();
-$inventory_request->setCompression(
-   $_SERVER['CONTENT_TYPE'] ?? false
-);
+
 
 $handle = true;
 if (isset($_GET['refused'])) {
@@ -60,13 +58,8 @@ if ($handle === true) {
 }
 
 if (isset($_GET['refused'])) {
-   header('Content-Type: application/json');
-   header('Cache-Control: no-cache,no-store');
-   header('Pragma: no-cache');
-   header('Connection: close');
-
-   echo json_encode($inventory_request->getInventoryStatus());
-
+   $redirect_url = $refused->handleInventoryRequest($inventory_request);
+   Html::redirect($redirect_url);
 } else {
    header('Content-Type: ' . $inventory_request->getContentType());
    header('Cache-Control: no-cache,no-store');

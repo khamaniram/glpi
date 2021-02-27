@@ -88,18 +88,13 @@ class Html {
       // Neutralize not well formatted html tags
       $value = preg_replace("/(<)([^>]*<)/", "&lt;$2", $value);
 
-      $value = htmLawed(
-         $value,
-         [
-            'elements'         => ($striptags) ? 'none' : '',
-            'deny_attribute'   => 'on*',
-            'keep_bad'         => $keep_bad, // 1: neutralize tag and content, 2 : remove tag and neutralize content
-            'comment'          => 1, // 1: remove
-            'cdata'            => 1, // 1: remove
-            'direct_list_nest' => 1, // 1: Allow usage of ul/ol tags nested in other ul/ol tags
-            'schemes'          => '*: aim, app, feed, file, ftp, gopher, http, https, irc, mailto, news, nntp, sftp, ssh, tel, telnet'
-         ]
-      );
+      $config = Toolbox::getHtmLawedSafeConfig();
+      $config['keep_bad'] = $keep_bad; // 1: neutralize tag and content, 2 : remove tag and neutralize content
+      if ($striptags) {
+         $config['elements'] = 'none';
+      }
+
+      $value = htmLawed($value, $config);
 
       // Special case : remove the 'denied:' for base64 img in case the base64 have characters
       // combinaison introduce false positive
@@ -3871,101 +3866,117 @@ JS;
       }
       $language_url = $CFG_GLPI['root_doc'] . '/public/lib/tinymce-i18n/langs/' . $language . '.js';
 
-      $readonlyjs = "readonly: false";
-      if ($readonly) {
-         $readonlyjs = "readonly: true";
+      $skin_url = $CFG_GLPI['root_doc'] . '/public/lib/tinymce/skins/ui/oxide';
+      $content_css = $CFG_GLPI['root_doc'] . '/public/lib/tinymce/skins/content/default/content.css';
+      if ($_SESSION['glpipalette'] === 'darker') {
+         $skin_url = $CFG_GLPI['root_doc'] . '/public/lib/tinymce/skins/ui/oxide-dark';
+         $content_css = $CFG_GLPI['root_doc'] . '/public/lib/tinymce/skins/content/dark/content.css';
       }
 
-      $darker_css = '';
-      if ($_SESSION['glpipalette'] === 'darker') {
-         $darker_css = $CFG_GLPI['root_doc']."/css/tiny_mce/dark_content.css";
-      }
+      $cache_suffix = '?v='.GLPI_VERSION;
+      $readonlyjs   = $readonly ? 'true' : 'false';
 
       // init tinymce
-      $js = "$(function() {
-         // init editor
-         tinyMCE.init({
-            language_url: '$language_url',
-            invalid_elements: 'form,object,embed,iframe,script,@[onclick|ondblclick|'
-               + 'onmousedown|onmouseup|onmouseover|onmousemove|onmouseout|onkeypress|'
-               + 'onkeydown|onkeyup]',
-            browser_spellcheck: true,
-            mode: 'exact',
-            elements: '$name',
-            relative_urls: false,
-            remove_script_host: false,
-            entity_encoding: 'raw',
-            paste_data_images: $('.fileupload').length,
-            menubar: false,
-            statusbar: false,
-            skin_url: '".$CFG_GLPI['root_doc']."/css/tiny_mce/skins/light',
-            content_css: '$darker_css,".$CFG_GLPI['root_doc']."/css/tiny_mce_custom.css',
-            cache_suffix: '?v=".GLPI_VERSION."',
-            setup: function(editor) {
-               if ($('#$name').attr('required') == 'required') {
-                  $('#$name').closest('form').find('input[type=submit]').click(function() {
+      $js = <<<JS
+         $(function() {
+            // init editor
+            tinyMCE.init({
+               selector: '#{$name}',
+
+               plugins: [
+                  'autoresize',
+                  'code',
+                  'colorpicker',
+                  'directionality',
+                  'fullscreen',
+                  'image',
+                  'link',
+                  'lists',
+                  'paste',
+                  'searchreplace',
+                  'tabfocus',
+                  'table',
+                  'textcolor',
+
+                  'glpi_upload_doc', // glpi_upload_doc specific plugin to upload files
+               ],
+
+               // Appearance
+               language: '{$language}',
+               language_url: '{$language_url}',
+
+               skin_url: '{$skin_url}',
+               content_css: '{$content_css}',
+
+               min_height: '150px',
+               resize: true,
+
+               menubar: false,
+               toolbar: 'styleselect | bold italic | forecolor backcolor | bullist numlist outdent indent | table link image | code fullscreen',
+
+               // Content settings
+               entity_encoding: 'raw',
+               invalid_elements: 'applet,canvas,embed,form,object',
+               paste_data_images: true,
+               readonly: {$readonlyjs},
+               relative_urls: false,
+               remove_script_host: false,
+
+               // Misc options
+               browser_spellcheck: true,
+               cache_suffix: '{$cache_suffix}',
+
+               setup: function(editor) {
+
+                  // "required" state handling
+                  if ($('#$name').attr('required') == 'required') {
+                     $('#$name').removeAttr('required'); // Necessary to bypass browser validation
+
+                     editor.on('submit', function (e) {
+                        if ($('#$name').val() == '') {
+                           alert(__('The description field is mandatory'));
+                           evt.preventDefault();
+                        }
+                     });
+                     editor.on('keyup', function (e) {
+                        editor.save();
+                        if ($('#$name').val() == '') {
+                           $(editor.container).addClass('required');
+                        } else {
+                           $(editor.container).removeClass('required');
+                        }
+                     });
+                     editor.on('init', function (e) {
+                        if ($('#$name').val() == '') {
+                           $(editor.container).addClass('required');
+                        }
+                     });
+                     editor.on('paste', function (e) {
+                        // Remove required on paste event
+                        // This is only needed when pasting with right click (context menu)
+                        // Pasting with Ctrl+V is already handled by keyup event above
+                        $(editor.container).removeClass('required');
+                     });
+                  }
+
+                  editor.on('SaveContent', function (contentEvent) {
+                     contentEvent.content = contentEvent.content.replace(/\\r?\\n/g, '');
+                  });
+                  editor.on('Change', function (e) {
+                     // Nothing fancy here. Since this is only used for tracking unsaved changes,
+                     // we want to keep the logic in common.js with the other form input events.
+                     onTinyMCEChange(e);
+                  });
+   
+                  // ctrl + enter submit the parent form
+                  editor.addShortcut('ctrl+13', 'submit', function() {
                      editor.save();
-                     if ($('#$name').val() == '') {
-                        alert('".__s('The description field is mandatory')."');
-                     }
-                  });
-                  editor.on('keyup', function (e) {
-                     editor.save();
-                     if ($('#$name').val() == '') {
-                        $('.mce-edit-area').addClass('required');
-                     } else {
-                        $('.mce-edit-area').removeClass('required');
-                     }
-                  });
-                  editor.on('init', function (e) {
-                     if ($('#$name').val() == '') {
-                        $('.mce-edit-area').addClass('required');
-                     }
-                  });
-                  editor.on('paste', function (e) {
-                     // Remove required on paste event
-                     // This is only needed when pasting with right click (context menu)
-                     // Pasting with Ctrl+V is already handled by keyup event above
-                     $('.mce-edit-area').removeClass('required');
+                     submitparentForm($('#$name'));
                   });
                }
-               editor.on('SaveContent', function (contentEvent) {
-                  contentEvent.content = contentEvent.content.replace(/\\r?\\n/g, '');
-               });
-               editor.on('Change', function (e) {
-                  // Nothing fancy here. Since this is only used for tracking unsaved changes,
-                  // we want to keep the logic in common.js with the other form input events.
-                  onTinyMCEChange(e);
-               });
-
-               // ctrl + enter submit the parent form
-               editor.addShortcut('ctrl+13', 'submit', function() {
-                  editor.save();
-                  submitparentForm($('#$name'));
-               });
-            },
-            plugins: [
-               'table directionality searchreplace',
-               'tabfocus autoresize link image paste',
-               'code fullscreen stickytoolbar',
-               'textcolor colorpicker',
-               // load glpi_upload_doc specific plugin if we need to upload files
-               typeof tinymce.AddOnManager.PluginManager.lookup.glpi_upload_doc != 'undefined'
-                  ? 'glpi_upload_doc'
-                  : '',
-               'lists'
-            ],
-            toolbar: 'styleselect | bold italic | forecolor backcolor | bullist numlist outdent indent | table link image | code fullscreen',
-            $readonlyjs
+            });
          });
-
-         // set sticky for split view
-         $('.layout_vsplit .main_form, .layout_vsplit .ui-tabs-panel').scroll(function(event) {
-            var editor = tinyMCE.get('$name');
-            editor.settings.sticky_offset = $(event.target).offset().top;
-            editor.setSticky();
-         });
-      });";
+JS;
 
       if ($display) {
          echo  Html::scriptBlock($js);
@@ -4747,14 +4758,11 @@ JS;
    static function jsAjaxDropdown($name, $field_id, $url, $params = []) {
       global $CFG_GLPI;
 
-      if (!isset($params['value'])) {
+      if (!array_key_exists('value', $params)) {
          $value = 0;
-      } else {
-         $value = $params['value'];
-      }
-      if (!isset($params['value'])) {
          $valuename = Dropdown::EMPTY_VALUE;
       } else {
+         $value = $params['value'];
          $valuename = $params['valuename'];
       }
       $on_change = '';
@@ -4800,9 +4808,7 @@ JS;
          $values = [];
 
          // simple select (multiple = no)
-         if ((isset($params['display_emptychoice']) && $params['display_emptychoice'])
-             || isset($params['toadd'][$value])
-             || $value > 0) {
+         if ($value !== null) {
             $values = ["$value" => $valuename];
          }
       }
@@ -5594,6 +5600,8 @@ JAVASCRIPT;
     *    - dropZone            string   DOM ID of the drop zone
     *    - rand                string   already computed rand value
     *    - display             boolean  display or return the generated html (default true)
+    *    - only_uploaded_files boolean  show only the uploaded files block, i.e. no title, no dropzone
+    *                                   (should be false when upload has to be enable only from rich text editor)
     *
     * @return void|string   the html if display parameter is false
    **/
@@ -5602,20 +5610,21 @@ JAVASCRIPT;
 
       $randupload             = mt_rand();
 
-      $p['name']              = 'filename';
-      $p['onlyimages']        = false;
-      $p['filecontainer']     = 'fileupload_info';
-      $p['showfilesize']      = true;
-      $p['showtitle']         = true;
-      $p['enable_richtext']   = false;
-      $p['pasteZone']         = false;
-      $p['dropZone']          = 'dropdoc'.$randupload;
-      $p['rand']              = $randupload;
-      $p['values']            = [];
-      $p['display']           = true;
-      $p['multiple']          = false;
-      $p['uploads']           = [];
-      $p['editor_id']         = null;
+      $p['name']                = 'filename';
+      $p['onlyimages']          = false;
+      $p['filecontainer']       = 'fileupload_info';
+      $p['showfilesize']        = true;
+      $p['showtitle']           = true;
+      $p['enable_richtext']     = false;
+      $p['pasteZone']           = false;
+      $p['dropZone']            = 'dropdoc'.$randupload;
+      $p['rand']                = $randupload;
+      $p['values']              = [];
+      $p['display']             = true;
+      $p['multiple']            = false;
+      $p['uploads']             = [];
+      $p['editor_id']           = null;
+      $p['only_uploaded_files'] = false;
 
       if (is_array($options) && count($options)) {
          foreach ($options as $key => $val) {
@@ -5624,13 +5633,17 @@ JAVASCRIPT;
       }
 
       $display = "";
-      $display .= "<div class='fileupload draghoverable' id='{$p['dropZone']}'>";
+      if ($p['only_uploaded_files']) {
+         $display .= "<div class='fileupload only-uploaded-files'>";
+      } else {
+         $display .= "<div class='fileupload draghoverable' id='{$p['dropZone']}'>";
 
-      if ($p['showtitle']) {
-         $display .= "<b>";
-         $display .= sprintf(__('%1$s (%2$s)'), __('File(s)'), Document::getMaxUploadSize());
-         $display .= DocumentType::showAvailableTypesLink(['display' => false]);
-         $display .= "</b>";
+         if ($p['showtitle']) {
+            $display .= "<b>";
+            $display .= sprintf(__('%1$s (%2$s)'), __('File(s)'), Document::getMaxUploadSize());
+            $display .= DocumentType::showAvailableTypesLink(['display' => false]);
+            $display .= "</b>";
+         }
       }
 
       $display .= self::uploadedFiles([
@@ -5643,15 +5656,31 @@ JAVASCRIPT;
       $max_file_size  = $CFG_GLPI['document_max_size'] * 1024 * 1024;
       $max_chunk_size = round(Toolbox::getPhpUploadSizeLimit() * 0.9); // keep some place for extra data
 
-      // manage file upload without tinymce editor
-      $display .= "<span class='b'>".__('Drag and drop your file here, or').'</span><br>';
+      if (!$p['only_uploaded_files']) {
+         // manage file upload without tinymce editor
+         $display .= "<span class='b'>".__('Drag and drop your file here, or').'</span><br>';
+      }
       $display .= "<input id='fileupload{$p['rand']}' type='file' name='".$p['name']."[]'
                       data-url='".$CFG_GLPI["root_doc"]."/ajax/fileupload.php'
                       data-form-data='{\"name\": \"".$p['name']."\", \"showfilesize\": \"".$p['showfilesize']."\"}'"
                       .($p['multiple']?" multiple='multiple'":"")
                       .($p['onlyimages']?" accept='.gif,.png,.jpg,.jpeg'":"").">";
-      $display .= "<div id='progress{$p['rand']}' style='display:none'>".
-              "<div class='uploadbar' style='width: 0%;'></div></div>";
+
+      $progressall_js = '';
+      if (!$p['only_uploaded_files']) {
+         $display .= "<div id='progress{$p['rand']}' style='display:none'>".
+                 "<div class='uploadbar' style='width: 0%;'></div></div>";
+         $progressall_js = "
+            progressall: function(event, data) {
+               var progress = parseInt(data.loaded / data.total * 100, 10);
+               $('#progress{$p['rand']}').show();
+               $('#progress{$p['rand']} .uploadbar')
+                  .text(progress + '%')
+                  .css('width', progress + '%')
+                  .show();
+            },
+         ";
+      }
 
       $display .= Html::scriptBlock("
       $(function() {
@@ -5665,18 +5694,10 @@ JAVASCRIPT;
                            ? "$('#{$p['dropZone']}')"
                            : "false").",
             acceptFileTypes: ".($p['onlyimages']
-                                 ? "'/(\.|\/)(gif|jpe?g|png)$/i'"
+                                    ? "/(\.|\/)(gif|jpe?g|png)$/i"
                                  : DocumentType::getUploadableFilePattern()).",
             maxFileSize: {$max_file_size},
             maxChunkSize: {$max_chunk_size},
-            progressall: function(event, data) {
-               var progress = parseInt(data.loaded / data.total * 100, 10);
-               $('#progress{$p['rand']}').show();
-               $('#progress{$p['rand']} .uploadbar')
-                  .text(progress + '%')
-                  .css('width', progress + '%')
-                  .show();
-            },
             done: function (event, data) {
                handleUploadedFile(
                   data.files, // files as blob
@@ -5703,7 +5724,8 @@ JAVASCRIPT;
             messages: {
               acceptFileTypes: __('Filetype not allowed'),
               maxFileSize: __('File is too big'),
-            }
+            },
+            $progressall_js
          });
       });");
 
@@ -5772,13 +5794,10 @@ JAVASCRIPT;
                      ");
       }
       if (!$p['enable_fileupload'] && $p['enable_richtext']) {
-         $display .= self::uploadedFiles([
-            'filecontainer' => $p['filecontainer'],
-            'name'          => $p['name'],
-            'display'       => false,
-            'uploads'       => $p['uploads'],
-            'editor_id'     => $p['editor_id'],
-         ]);
+         $p_rt = $p;
+         $p_rt['display'] = false;
+         $p_rt['only_uploaded_files'] = true;
+         $display .= Html::file($p_rt);
       }
 
       if ($p['enable_fileupload']) {

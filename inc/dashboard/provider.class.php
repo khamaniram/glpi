@@ -34,7 +34,6 @@ namespace Glpi\Dashboard;
 
 use Change;
 use CommonDBTM;
-use CommonGLPI;
 use CommonITILActor;
 use CommonITILObject;
 use CommonITILValidation;
@@ -60,7 +59,7 @@ if (!defined('GLPI_ROOT')) {
 /**
  * Provider class
 **/
-class Provider extends CommonGLPI {
+class Provider {
 
 
    /**
@@ -715,7 +714,7 @@ class Provider extends CommonGLPI {
                      'field'      => 15, // creation date
                      'searchtype' => 'lessthan',
                      'value'      => null
-                  ]
+                  ],self::getSearchFiltersCriteria($t_table, $params['apply_filters']),
                ],
                'reset' => 'reset'
             ]
@@ -734,7 +733,7 @@ class Provider extends CommonGLPI {
                      'field'      => 17, // solve date
                      'searchtype' => 'lessthan',
                      'value'      => null
-                  ]
+                  ],self::getSearchFiltersCriteria($t_table, $params['apply_filters']),
                ],
                'reset' => 'reset'
             ]
@@ -758,7 +757,7 @@ class Provider extends CommonGLPI {
                      'field'      => 82, // time_to_resolve exceed solve date
                      'searchtype' => 'equals',
                      'value'      => 1
-                  ]
+                  ],self::getSearchFiltersCriteria($t_table, $params['apply_filters']),
                ],
                'reset' => 'reset'
             ]
@@ -777,7 +776,7 @@ class Provider extends CommonGLPI {
                      'field'      => 16, // close date
                      'searchtype' => 'lessthan',
                      'value'      => null
-                  ]
+                  ],self::getSearchFiltersCriteria($t_table, $params['apply_filters']),
                ],
                'reset' => 'reset'
             ]

@@ -563,7 +563,6 @@ class Software extends CommonDBTM {
          'forcegroupby'       => true,
          'usehaving'          => true,
          'datatype'           => 'count',
-         'nometa'             => true,
          'massiveaction'      => false,
          'joinparams'         => [
             'jointype'   => 'child',
@@ -584,6 +583,25 @@ class Software extends CommonDBTM {
          );
       }
       $tab[] = $newtab;
+
+      $tab[] = [
+         'id'                 => '73',
+         'table'              => 'glpi_items_softwareversions',
+         'field'              => 'date_install',
+         'name'               => __('Installation date'),
+         'datatype'           => 'date',
+         'massiveaction'      => false,
+         'joinparams'         => [
+            'jointype'   => 'child',
+            'beforejoin' => [
+               'table'      => 'glpi_softwareversions',
+               'joinparams' => ['jointype' => 'child'],
+            ],
+            'condition'  => "AND NEWTABLE.`is_deleted_item` = 0
+                             AND NEWTABLE.`is_deleted` = 0
+                             AND NEWTABLE.`is_template_item` = 0",
+         ]
+      ];
 
       $tab = array_merge($tab, SoftwareLicense::rawSearchOptionsToAdd());
 
@@ -622,7 +640,7 @@ class Software extends CommonDBTM {
                   'jointype'           => 'child'
                ]
             ]
-         ]
+         ],
       ];
 
       $tab[] = [
@@ -652,7 +670,7 @@ class Software extends CommonDBTM {
                   'jointype'           => 'child'
                ]
             ]
-         ]
+         ],
       ];
 
       // add objectlock search options

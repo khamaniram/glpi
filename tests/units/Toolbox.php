@@ -33,6 +33,10 @@
 namespace tests\units;
 
 use Glpi\Api\Deprecated\TicketFollowup;
+use Glpi\Features\Clonable;
+use Glpi\Features\DCBreadcrumb;
+use Glpi\Features\Kanban;
+use Glpi\Features\PlanningEvent;
 use ITILFollowup;
 use Ticket;
 
@@ -61,11 +65,14 @@ class Toolbox extends \GLPITestCase {
       return [
          [
             'string'   => 'My - string èé  Ê À ß',
-            'expected' => 'my-string-ee-e-a-sz'
+            'expected' => 'my-string-ee-e-a-ss'
          ], [
             //https://github.com/glpi-project/glpi/issues/2946
             'string'   => 'Έρευνα ικανοποίησης - Αιτήματα',
             'expected' => 'ereuna-ikanopoieses-aitemata'
+         ], [
+            'string'   => 'a-valid-one',
+            'expected' => 'a-valid-one',
          ]
       ];
    }
@@ -75,6 +82,57 @@ class Toolbox extends \GLPITestCase {
     */
    public function testSlugify($string, $expected) {
       $this->string(\Toolbox::slugify($string))->isIdenticalTo($expected);
+   }
+
+   protected function filenameProvider() {
+      return [
+         [
+            'name'  => '00-logoteclib.png',
+            'expected'  => '00-logoteclib.png',
+         ], [
+            // Space is missing between "France" and "très" due to a bug in laminas-mail
+            'name'  => '01-Screenshot-2018-4-12 Observatoire - Francetrès haut débit.png',
+            'expected'  => '01-screenshot-2018-4-12-observatoire-francetres-haut-debit.png',
+         ], [
+            'name'  => '01-test.JPG',
+            'expected'  => '01-test.JPG',
+         ], [
+            'name'  => '15-image001.png',
+            'expected'  => '15-image001.png',
+         ], [
+            'name'  => '18-blank.gif',
+            'expected'  => '18-blank.gif',
+         ], [
+            'name'  => '19-ʂǷèɕɩɐɫ ȼɦâʁȿ.gif',
+            'expected'  => '19-secl-chas.gif',
+         ], [
+            'name'  => '20-specïal chars.gif',
+            'expected'  => '20-special-chars.gif',
+         ], [
+            'name'  => '24.1-长文件名，将导致内容处置标头中的连续行.txt',
+            'expected'  => '24.1-zhang-wen-jian-ming-jiang-dao-zhi-nei-rong-chu-zhi-biao-tou-zhong-de-lian-xu-xing.txt',
+         ], [
+            'name'  => '24.2-中国字符.txt',
+            'expected'  => '24.2-zhong-guo-zi-fu.txt',
+         ], [
+            'name'  => '25-New Text - Document.txt',
+            'expected'  => '25-new-text-document.txt',
+         ], [
+            'name'     => 'Έρευνα ικανοποίησης - Αιτήματα',
+            'expected' => 'ereuna-ikanopoieses-aitemata'
+         ], [
+            'name'     => 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc gravida, nisi vel scelerisque feugiat, tellus purus volutpat justo, vel aliquam nibh nibh sit amet risus. Aenean eget urna et felis molestie elementum nec sit amet magna. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum nec malesuada elit, non luctus mi. Aliquam quis velit justo. Donec id pulvinar nunc. Phasellus.txt',
+            'expected' => 'lorem-ipsum-dolor-sit-amet-consectetur-adipiscing-elit.-nunc-gravida-nisi-vel-scelerisque-feugiat-tellus-purus-volutpat-justo-vel-aliquam-.txt'
+         ]
+      ];
+   }
+
+   /**
+    * @dataProvider filenameProvider
+    */
+   public function testFilename($name, $expected) {
+      $this->string(\Toolbox::filename($name))->isIdenticalTo($expected);
+      $this->integer(strlen($expected))->isLessThanOrEqualTo(255);
    }
 
    public function dataGetSize() {
@@ -445,10 +503,34 @@ class Toolbox extends \GLPITestCase {
 
    protected function cleanHtmlProvider() {
       $dataset = $this->cleanProvider();
+
+      // nested list should be preserved
       $dataset[] = [
-         ['<div>Here a list example: <pre>&lt;ul&gt;&lt;li&gt;one&lt;/li&gt;&lt;li&gt;two&lt;/li&gt;&lt;/ul&gt;</pre></div>'],
-         ['&lt;div&gt;Here a list example: &lt;pre&gt;&lt;ul&gt;&lt;li&gt;one&lt;/li&gt;&lt;li&gt;two&lt;/li&gt;&lt;/ul&gt;&lt;/pre&gt;']
+         '<div>Here a list example: <ul><li>one, with nested<ul><li>nested list</li></ul></li><li>two</li></ul></div>',
+         '&lt;div&gt;Here a list example: &lt;ul&gt;&lt;li&gt;one, with nested&lt;ul&gt;&lt;li&gt;nested list&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;li&gt;two&lt;/li&gt;&lt;/ul&gt;'
       ];
+      // on* attributes are not allowed
+      $dataset[] = [
+         '<img src="test.png" alt="test image" />',
+         '&lt;img src="test.png" alt="test image" onerror="javascript:alert(document.cookie);" /&gt;'
+      ];
+      $dataset[] = [
+         '<img src="test.png" alt="test image" />',
+         '&lt;img src="test.png" alt="test image" onload="javascript:alert(document.cookie);" /&gt;'
+      ];
+      // iframes should not be preserved by default
+      $dataset[] = [
+         'Here is an iframe: ', 'Here is an iframe: &lt;iframe src="http://glpi-project.org/"&gt;&lt;/iframe&gt;'
+      ];
+      // HTML comments should be removed
+      $dataset[] = [
+         '<p>Legit text</p>', '&lt;p&gt;Legit&lt;!-- This is an HTML comment --&gt; text&lt;/p&gt;'
+      ];
+      // CDATA should be removed
+      $dataset[] = [
+         '<p>Legit text</p>', '&lt;p&gt;Legit&lt;![CDATA[Some CDATA]]&gt; text&lt;/p&gt;'
+      ];
+
       return $dataset;
    }
 
@@ -987,5 +1069,28 @@ class Toolbox extends \GLPITestCase {
          ->withType(E_USER_DEPRECATED)
          ->withMessage('Calling this function is deprecated')
          ->exists();
+   }
+
+   public function hasTraitProvider() {
+      return [
+         [\Computer::class, Clonable::class, true],
+         [\Monitor::class, Clonable::class, true],
+         [\CommonITILObject::class, Clonable::class, true],
+         [\Ticket::class, Clonable::class, true],
+         [\Plugin::class, Clonable::class, false],
+         [\Project::class, Kanban::class, true],
+         [\Computer::class, Kanban::class, false],
+         [\Computer::class, DCBreadcrumb::class, true],
+         [\Ticket::class, DCBreadcrumb::class, false],
+         [\CommonITILTask::class, PlanningEvent::class, true],
+         [\Computer::class, PlanningEvent::class, false],
+      ];
+   }
+
+   /**
+    * @dataProvider hasTraitProvider
+    */
+   public function testHasTrait($class, $trait, $result) {
+      $this->boolean(\Toolbox::hasTrait($class, $trait))->isIdenticalTo((bool)$result);
    }
 }

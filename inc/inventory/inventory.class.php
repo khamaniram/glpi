@@ -55,7 +55,7 @@ class Inventory
    /** @var array */
    protected $data = [];
    /** @var array */
-   private $metadata;
+   private $metadata = [];
    /** @var array */
    private $errors = [];
    /** @var CommonDBTM */
@@ -181,6 +181,10 @@ class Inventory
          throw new \RuntimeException(print_r($this->getErrors(), true));
       }
 
+      if (!isset($_SESSION['glpiinventoryuserrunning'])) {
+          $_SESSION['glpiinventoryuserrunning'] = 'inventory';
+      }
+
       try {
          //bench
          $main_start = microtime(true);
@@ -302,14 +306,39 @@ class Inventory
          $DB->rollback();
          throw $e;
       } finally {
+         unset($_SESSION['glpiinventoryuserrunning']);
          $this->handleInventoryFile();
          // * For benchs
          $id = $this->item->fields['id'] ?? 0;
-         $this->addBench($this->item->getType() . ' #' . $id, 'full', $main_start);
+         $items = $this->mainasset->getInventoried() + $this->mainasset->getRefused();
+         $extra = null;
+         if (count($items)) {
+            $extra = 'Inventoried assets: ';
+            foreach ($items as $item) {
+               $extra .= $item->getType() . ' #' . $item->getId() . ', ';
+            }
+            $extra = rtrim($extra, ', ') . "\n";
+         }
+         $this->addBench($this->item->getType(), 'full', $main_start, $extra);
          $this->printBenchResults();
       }
 
       return [];
+   }
+
+   /**
+    * Get inventoried items
+    *
+    * @return array
+    */
+   public function getItems(): array {
+      $items = $this->mainasset->getInventoried();
+
+      foreach ($this->mainasset->getRefused() as $refused) {
+         $items[] = $refused;
+      }
+
+      return $items;
    }
 
    /**
@@ -321,14 +350,7 @@ class Inventory
       $ext = (Request::XML_MODE === $this->inventory_format ? 'xml' : 'json');
       $tmpfile = sprintf('%s/%s.%s', GLPI_INVENTORY_DIR, $this->inventory_id, $ext);
 
-      $items = [];
-      if ($this->item !== null && !$this->item->isNewItem()) {
-         $items[] = $this->item;
-      }
-
-      foreach ($this->mainasset->getRefused() as $refused) {
-         $items[] = $refused;
-      }
+      $items = $this->getItems();
 
       foreach ($items as $item) {
          $itemtype = $item->getType();
@@ -447,7 +469,6 @@ class Inventory
             case 'logical_volumes': //not used
             case 'ports': //not used
             case 'processes': //not used
-            case 'remote_mgmt': //not used - implemented in FI only
             case 'slots': //not used
             case 'versionclient': //not used
             case 'versionprovider': //not provided see doInventory
@@ -528,6 +549,9 @@ class Inventory
             case 'cartridges':
                $assettype = '\Glpi\Inventory\Asset\Cartridge';
                break;
+            case 'remote_mgmt':
+               $assettype = '\Glpi\Inventory\Asset\RemoteManagement';
+               break;
             default:
                if (method_exists($this, 'processExtraInventoryData')) {
                   $assettype = $this->processExtraInventoryData($key);
@@ -589,16 +613,18 @@ class Inventory
     * @param string  $asset Asset
     * @param string  $type Either prepare or handle
     * @param integer $start Start time
+    * @param string  $extra Extra value to be used as label
     *
     * @return void
     */
-   protected function addBench($asset, $type, $start) {
+   protected function addBench($asset, $type, $start, $extra = null) {
       $exec_time = round(microtime(true) - $start, 5);
       $this->benchs[$asset][$type] = [
          'exectime'  => $exec_time,
          'mem'       => memory_get_usage(),
          'mem_real'  => memory_get_usage(true),
-         'mem_peak'  => memory_get_peak_usage()
+         'mem_peak'  => memory_get_peak_usage(),
+         'extra'     => $extra
 
       ];
    }
@@ -636,10 +662,13 @@ class Inventory
                      _n('%s second', '%s seconds', $value),
                      $value
                   );
-               } else {
+               } else if ($key != 'extra') {
                   $output .= Toolbox::getSize($value);
                }
                $output .= "\n";
+            }
+            if (isset($data['extra'])) {
+               $output .= $data['extra'];
             }
          }
       }
@@ -780,4 +809,7 @@ class Inventory
       return $cron_status;
    }
 
+   public static function getTypeName($nb = 0) {
+      return __("Inventory");
+   }
 }

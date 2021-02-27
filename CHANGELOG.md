@@ -21,11 +21,18 @@ The present file will list all changes made to the project; according to the
 #### Added
 
 #### Changes
+- Format of `Message-Id` header sent in Tickets notifications changed to match format used by other items.
 
 #### Deprecated
 - Usage of `GLPI_FORCE_EMPTY_SQL_MODE` constant
 - Usage of `CommonDBTM::notificationqueueonaction` property
-- `RuleImportComputer` and `RuleImportComputerCollection`
+- `DBmysql::getTableSchema()`
+- `Calendar::duplicate()`
+- `CommonDBTM::clone()`
+- `CommonDBTM::prepareInputForClone()`
+- `CommonDBTM::post_clone()`
+- `RuleImportComputer` class
+- `RuleImportComputerCollection` class
 
 #### Removed
 - `Update::declareOldItems()`
@@ -99,6 +106,18 @@ The present file will list all changes made to the project; according to the
 
 - `Reservation::displayReservationDay()`
 - `Reservation::displayReservationsForAnItem()`
+
+## [9.5.4] unreleased
+
+### Changed
+
+- `iframe` elements are not anymore allowed in rich text unless `GLPI_ALLOW_IFRAME_IN_RICH_TEXT` constant is defined to `true`
+
+### API changes
+
+#### Deprecated
+
+- `Search::getMetaReferenceItemtype()`
 
 ## [9.5.3] 2020-11-25
 

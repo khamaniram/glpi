@@ -41,9 +41,9 @@ if (substr(GLPI_VERSION, -4) === '-dev') {
    );
 } else {
    //for stable version
-   define("GLPI_SCHEMA_VERSION", '9.5.3');
+   define("GLPI_SCHEMA_VERSION", '9.5.4');
 }
-define('GLPI_MIN_PHP', '7.2.5'); // Must also be changed in top of index.php
+define('GLPI_MIN_PHP', '7.3.0'); // Must also be changed in top of index.php
 define('GLPI_YEAR', '2021');
 
 //Define a global recipient address for email notifications
@@ -474,6 +474,8 @@ $CFG_GLPI['appliance_types']     = ['Computer', 'Monitor', 'NetworkEquipment', '
                                        'Printer', 'Software', 'Cluster'];
 
 $CFG_GLPI['appliance_relation_types'] = ['Location', 'Network', 'Domain'];
+
+$CFG_GLPI['remote_management_types'] = ['Computer', 'Phone'];
 
 $dashboard_libs = [
    'dashboard', 'gridstack',

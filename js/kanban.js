@@ -292,6 +292,13 @@ class GLPIKanbanRights {
       let _backgroundRefresh = null;
 
       /**
+       * Reference for the background refresh timer
+       * @type {null}
+       * @private
+       */
+      var _backgroundRefreshTimer = null;
+
+      /**
        * The user's state object.
        * This contains an up to date list of columns that should be shown, the order they are in, and if they are folded.
        * @since 9.5.0
@@ -847,7 +854,7 @@ class GLPIKanbanRights {
             );
          }
 
-         $(self.element + ' .kanban-container').on('submit', '.kanban-add-form', function(e) {
+         $(self.element + ' .kanban-container').on('submit', '.kanban-add-form:not(.kanban-bulk-add-form)', function(e) {
             e.preventDefault();
             const form = $(e.target);
             const data = {
@@ -1661,7 +1668,7 @@ class GLPIKanbanRights {
 
          const uniqueID = Math.floor(Math.random() * 999999);
          const formID = "form_add_" + itemtype + "_" + uniqueID;
-         let add_form = "<form id='" + formID + "' class='kanban-add-form kanban-form no-track'>";
+         let add_form = "<form id='" + formID + "' class='kanban-add-form kanban-bulk-add-form kanban-form no-track'>";
 
          add_form += `
             <div class='kanban-item-header'>
@@ -1677,7 +1684,6 @@ class GLPIKanbanRights {
          `;
 
          add_form += "<div class='kanban-item-content'>";
-         add_form += "<textarea name='bulk_item_list'></textarea>";
          $.each(self.supported_itemtypes[itemtype]['fields'], function(name, options) {
             const input_type = options['type'] !== undefined ? options['type'] : 'text';
             const value = options['value'] !== undefined ? options['value'] : '';
@@ -1689,8 +1695,11 @@ class GLPIKanbanRights {
                   add_form += " value='" + value + "'";
                }
                add_form += "/>";
+            } else if (input_type.toLowerCase() === 'raw') {
+               add_form += value;
             }
          });
+         add_form += "<textarea name='bulk_item_list'></textarea>";
          add_form += "</div>";
 
          const column_id_elements = column_el.prop('id').split('-');
@@ -1790,7 +1799,8 @@ class GLPIKanbanRights {
        * @since 9.5.0
        */
       const delayRefresh = function() {
-         window.setTimeout(_backgroundRefresh, 10000);
+         window.clearTimeout(_backgroundRefreshTimer);
+         _backgroundRefreshTimer = window.setTimeout(_backgroundRefresh, 10000);
       };
 
       /**
@@ -2300,11 +2310,11 @@ class GLPIKanbanRights {
             }
             // Refresh and then schedule the next refresh (minutes)
             self.refresh(null, null, function() {
-               window.setTimeout(_backgroundRefresh, self.background_refresh_interval * 60 * 1000);
+               _backgroundRefreshTimer = window.setTimeout(_backgroundRefresh, self.background_refresh_interval * 60 * 1000);
             }, false);
          };
          // Schedule initial background refresh (minutes)
-         window.setTimeout(_backgroundRefresh, self.background_refresh_interval * 60 * 1000);
+         _backgroundRefreshTimer = window.setTimeout(_backgroundRefresh, self.background_refresh_interval * 60 * 1000);
       };
 
       /**

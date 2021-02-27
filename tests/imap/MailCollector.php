@@ -32,7 +32,15 @@
 
 namespace tests\units;
 
+use Config;
 use DbTestCase;
+use ITILFollowup;
+use Laminas\Mail\Storage\Message;
+use NotificationTarget;
+use NotificationTargetSoftwareLicense;
+use NotificationTargetTicket;
+use SoftwareLicense;
+use Ticket;
 
 class MailCollector extends DbTestCase {
    private $collector;
@@ -189,6 +197,301 @@ class MailCollector extends DbTestCase {
       $this->integer($this->testedInstance->countCollectors())->isIdenticalTo(1);
    }
 
+   protected function messageIdHeaderProvider() {
+      $root_ent_id = getItemByTypeName('Entity', '_test_root_entity', true);
+
+      $ticket_notif = new NotificationTargetTicket($root_ent_id, 'test_event', getItemByTypeName('Ticket', '_ticket01'));
+      $soft_notif = new NotificationTargetSoftwareLicense($root_ent_id, 'test_event', getItemByTypeName('SoftwareLicense', '_test_softlic_1'));
+      $base_notif = new NotificationTarget();
+
+      $uuid = Config::getUuid('notification');
+
+      $time = time();
+      $rand = rand();
+      $uname = 'localhost';
+
+      return [
+         [
+            'headers'  => [],
+            'expected' => false,
+         ],
+         [
+            'headers'  => [
+               'message-id' => 'donotknow',
+            ],
+            'expected' => false,
+         ],
+         [
+            'headers'  => [
+               'message-id' => "GLPI-1.{$time}.{$rand}@{$uname}", // old ticket format
+            ],
+            'expected' => true,
+         ],
+         [
+            'headers'  => [
+               'message-id' => "GLPI-SoftwareLicence-1.{$time}.{$rand}@{$uname}", // old format with object relation
+            ],
+            'expected' => true,
+         ],
+         [
+            'headers'  => [
+               'message-id' => "GLPI.{$time}.{$rand}@{$uname}", // old format without object relation
+            ],
+            'expected' => true,
+         ],
+         [
+            'headers'  => [
+               'message-id' => $ticket_notif->getMessageID(), // new format for ticket
+            ],
+            'expected' => true,
+         ],
+         [
+            'headers'  => [
+               'message-id' => $soft_notif->getMessageID(), // new format with object relation
+            ],
+            'expected' => true,
+         ],
+         [
+            'headers'  => [
+               'message-id' => $base_notif->getMessageID(), // new format without object relation
+            ],
+            'expected' => true,
+         ],
+         [
+            'headers'  => [
+               'message-id' => "GLPI_notmyuuid-Ticket-1.{$time}.{$rand}@{$uname}", // new format with object relation
+            ],
+            'expected' => false,
+         ],
+         [
+            'headers'  => [
+               'message-id' => "GLPI_notmyuuid.{$time}.{$rand}@{$uname}", // new format without object relation
+            ],
+            'expected' => false,
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider messageIdHeaderProvider
+    */
+   public function testIsMessageSentByGlpi(array $headers, bool $expected) {
+      $this->newTestedInstance();
+
+      $message = new Message(
+         [
+            'headers' => $headers,
+            'content' => 'Message contents...',
+         ]
+      );
+
+      $this->boolean($this->testedInstance->isMessageSentByGlpi($message))->isEqualTo($expected);
+   }
+
+   protected function itemReferenceHeaderProvider() {
+      $root_ent_id = getItemByTypeName('Entity', '_test_root_entity', true);
+
+      $ticket_id = getItemByTypeName('Ticket', '_ticket01', true);
+      $ticket_notif = new NotificationTargetTicket($root_ent_id, 'test_event', getItemByTypeName('Ticket', '_ticket01'));
+
+      $soft_id   = getItemByTypeName('SoftwareLicense', '_test_softlic_1', true);
+      $soft_notif = new NotificationTargetSoftwareLicense($root_ent_id, 'test_event', getItemByTypeName('SoftwareLicense', '_test_softlic_1'));
+
+      $uuid = Config::getUuid('notification');
+
+      $time1 = time() - 548;
+      $time2 = $time1 - 1567;
+      $rand1 = rand();
+      $rand2 = rand();
+      $uname1 = 'localhost';
+      $uname2 = 'mail.glpi-project.org';
+
+      return [
+         // invalid header
+         [
+            'headers'           => [
+               'in-reply-to' => 'notavalidvalue',
+               'references'  => 'donotknow',
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => true,
+         ],
+         // old ticket format - found item
+         [
+            'headers'           => [
+               'in-reply-to' => "GLPI-{$ticket_id}.{$time1}.{$rand1}@{$uname1}",
+            ],
+            'expected_itemtype' => Ticket::class,
+            'expected_items_id' => $ticket_id,
+            'accepted'          => true,
+         ],
+         [
+            'headers'           => [
+               'references'  => "GLPI-{$ticket_id}.{$time1}.{$rand1}@{$uname2}",
+            ],
+            'expected_itemtype' => Ticket::class,
+            'expected_items_id' => $ticket_id,
+            'accepted'          => true,
+         ],
+         // old ticket format - invalid items_id
+         [
+            'headers'           => [
+               'in-reply-to' => "GLPI-9999999.{$time2}.{$rand2}@{$uname1}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => true,
+         ],
+         // old items header format - found item
+         [
+            'headers'           => [
+               'in-reply-to' => "GLPI-SoftwareLicense-{$soft_id}.{$time1}.{$rand2}@{$uname2}",
+            ],
+            'expected_itemtype' => SoftwareLicense::class,
+            'expected_items_id' => $soft_id,
+            'accepted'          => true,
+         ],
+         // old items header format - invalid itemtype
+         [
+            'headers'           => [
+               'references'  => "GLPI-UnknownType-{$soft_id}.{$time2}.{$rand2}@{$uname1}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => true,
+         ],
+         // old items header format - invalid items_id
+         [
+            'headers'           => [
+               'references'  => "GLPI-SoftwareLicense-9999999.{$time1}.{$rand1}@{$uname2}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => true,
+         ],
+         // new header format - found item
+         [
+            'headers'           => [
+               'in-reply-to' => $ticket_notif->getMessageID(),
+            ],
+            'expected_itemtype' => Ticket::class,
+            'expected_items_id' => $ticket_id,
+            'accepted'          => true,
+         ],
+         [
+            'headers'           => [
+               'references'  => $soft_notif->getMessageID(),
+            ],
+            'expected_itemtype' => SoftwareLicense::class,
+            'expected_items_id' => $soft_id,
+            'accepted'          => true,
+         ],
+         [
+            'headers'           => [
+               'in-reply-to' => 'notavalidvalue',
+               'references'  => $soft_notif->getMessageID(),
+            ],
+            'expected_itemtype' => SoftwareLicense::class,
+            'expected_items_id' => $soft_id,
+            'accepted'          => true,
+         ],
+         [
+            'headers'           => [
+               'in-reply-to' => $soft_notif->getMessageID(),
+               'references'  => 'donotknow',
+            ],
+            'expected_itemtype' => SoftwareLicense::class,
+            'expected_items_id' => $soft_id,
+            'accepted'          => true,
+         ],
+         // new header format - invalid itemtype
+         [
+            'headers'           => [
+               'references'  => "GLPI_{$uuid}-UnknownType-{$ticket_id}.{$time2}.{$rand2}@{$uname1}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => true,
+         ],
+         // new header format - invalid items_id
+         [
+            'headers'           => [
+               'references'  => "GLPI_{$uuid}-Ticket-9999999.{$time1}.{$rand1}@{$uname1}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => true,
+         ],
+         // new header format - uuid from another GLPI instance
+         [
+            'headers'           => [
+               'in-reply-to' => "GLPI_notmyuuid-Ticket-{$ticket_id}.{$time1}.{$rand1}@{$uname2}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => false,
+         ],
+         [
+            'headers'           => [
+               'references'  => "GLPI_notmyuuid-Ticket-{$ticket_id}.{$time2}.{$rand2}@{$uname1}",
+            ],
+            'expected_itemtype' => null,
+            'expected_items_id' => null,
+            'accepted'          => false,
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider itemReferenceHeaderProvider
+    */
+   public function testGetItemFromHeader(
+      array $headers,
+      ?string $expected_itemtype,
+      ?int $expected_items_id,
+      bool $accepted
+   ) {
+      $this->newTestedInstance();
+
+      $message = new Message(
+         [
+            'headers' => $headers,
+            'content' => 'Message contents...',
+         ]
+      );
+
+      $item = $this->testedInstance->getItemFromHeaders($message);
+
+      if ($expected_itemtype === null) {
+         $this->variable($item)->isNull();
+      } else {
+         $this->object($item)->isInstanceOf($expected_itemtype);
+         $this->integer($item->getId())->isEqualTo($expected_items_id);
+      }
+   }
+
+   /**
+    * @dataProvider itemReferenceHeaderProvider
+    */
+   public function testIsResponseToMessageSentByAnotherGlpi(
+      array $headers,
+      ?string $expected_itemtype,
+      ?int $expected_items_id,
+      bool $accepted
+   ) {
+      $this->newTestedInstance();
+
+      $message = new Message(
+         [
+            'headers' => $headers,
+            'content' => 'Message contents...',
+         ]
+      );
+
+      $this->boolean($this->testedInstance->isResponseToMessageSentByAnotherGlpi($message))->isEqualTo(!$accepted);
+   }
+
    private function doConnect() {
       if (null === $this->collector) {
          $this->newTestedInstance();
@@ -203,7 +506,7 @@ class MailCollector extends DbTestCase {
          'login'                 => 'testuser',
          'is_active'             => true,
          'passwd'                => 'applesauce',
-         'mail_server'           => '127.0.0.1',
+         'mail_server'           => 'dovecot',
          'server_type'           => '/imap',
          'server_port'           => 143,
          'server_ssl'            => '',
@@ -216,7 +519,7 @@ class MailCollector extends DbTestCase {
       $this->integer($this->mailgate_id)->isGreaterThan(0);
 
       $this->boolean($collector->getFromDB($this->mailgate_id))->isTrue();
-      $this->string($collector->fields['host'])->isIdenticalTo('{127.0.0.1:143/imap/novalidate-cert}');
+      $this->string($collector->fields['host'])->isIdenticalTo('{dovecot:143/imap/novalidate-cert}');
       $collector->connect();
       $this->variable($collector->fields['errors'])->isEqualTo(0);
    }
@@ -224,6 +527,9 @@ class MailCollector extends DbTestCase {
    public function testCollect() {
       global $DB;
       $_SESSION['glpicronuserrunning'] = 'cron_phpunit';
+
+      // Force notification_uuid
+      Config::setConfigurationValues('core', ['notification_uuid' => 't3StN0t1f1c4tiOnUUID']);
 
       //assign email to user
       $nuid = getItemByTypeName('User', 'normal', true);
@@ -252,7 +558,7 @@ class MailCollector extends DbTestCase {
       $total_count                     = count(glob(GLPI_ROOT . '/tests/emails-tests/*.eml'));
       $expected_refused_count          = 2;
       $expected_error_count            = 2;
-      $expected_blacklist_count        = 0;
+      $expected_blacklist_count        = 3;
       $expected_expected_already_seen  = 0;
 
       $this->variable($msg)->isIdenticalTo(
@@ -311,7 +617,6 @@ class MailCollector extends DbTestCase {
             'actor_type'    => \CommonITILActor::REQUESTER,
             'tickets_names' => [
                'PHP fatal error',
-               'Re: [GLPI #0001155] New ticket database issue',
                'Ticket with observer',
                'Re: [GLPI #0038927] Update - Issues with new Windows 10 machine',
                'A message without to header',
@@ -335,6 +640,9 @@ class MailCollector extends DbTestCase {
                'Attachement having filename using RFC5987 (multiple lines)',
                'Attachement having filename using RFC5987 (single line)',
                'Mono-part HTML message',
+               '24.1 Test attachment with long multibyte filename',
+               '24.2 Test attachment with short multibyte filename',
+               '25 - Test attachment with invalid chars for OS'
             ]
          ],
          // Mails having "normal" user as observer (add_cc_to_observer = true)
@@ -395,12 +703,16 @@ class MailCollector extends DbTestCase {
       // Check creation of expected documents
       $expected_docs = [
          '00-logoteclib.png',
-         '01-Screenshot-2018-4-12 Observatoire - France très haut débit.png',
+         // Space is missing between "France" and "très" due to a bug in laminas-mail
+         '01-screenshot-2018-4-12-observatoire-francetres-haut-debit.png',
          '01-test.JPG',
          '15-image001.png',
          '18-blank.gif',
-         '19-ʂǷèɕɩɐɫ ȼɦâʁȿ.gif',
-         '20-specïal chars.gif',
+         '19-secl-chas.gif',
+         '20-special-chars.gif',
+         '24.1-zhang-wen-jian-ming-jiang-dao-zhi-nei-rong-chu-zhi-biao-tou-zhong-de-lian-xu-xing.txt',
+         '24.2-zhong-guo-zi-fu.txt',
+         '25-new-text-document.txt',
       ];
 
       $iterator = $DB->request(
@@ -431,5 +743,290 @@ class MailCollector extends DbTestCase {
       $this->array($filenames)->isIdenticalTo($expected_docs);
 
       $this->integer(count($iterator))->isIdenticalTo(count($expected_docs));
+
+      // Check creation of expected followups
+      $expected_followups = [
+         [
+            'items_id' => 100,
+            'users_id' => $tuid,
+            'content'  => 'This is a reply that references Ticket 100 in In-Reply-To header (old format).&lt;br /&gt;It should be added as followup.',
+         ],
+         [
+            'items_id' => 100,
+            'users_id' => $tuid,
+            'content'  => 'This is a reply that references Ticket 100 in References header (old format).&lt;br /&gt;It should be added as followup.',
+         ],
+         [
+            'items_id' => 101,
+            'users_id' => $tuid,
+            'content'  => 'This is a reply that references Ticket 101 in its subject.&lt;br /&gt;It should be added as followup.',
+         ],
+         [
+            'items_id' => 100,
+            'users_id' => $tuid,
+            'content'  => 'This is a reply that references Ticket 100 in In-Reply-To header (new format).&lt;br /&gt;It should be added as followup.',
+         ],
+         [
+            'items_id' => 100,
+            'users_id' => $tuid,
+            'content'  => 'This is a reply that references Ticket 100 in References header (new format).&lt;br /&gt;It should be added as followup.',
+         ],
+      ];
+
+      foreach ($expected_followups as $expected_followup) {
+         $this->integer(countElementsInTable(ITILFollowup::getTable(), $expected_followup))->isEqualTo(1);
+      }
+   }
+
+   protected function mailServerProtocolsProvider() {
+      return [
+         [
+            'cnx_string'        => '',
+            'expected_type'     => '',
+            'expected_protocol' => null,
+            'expected_storage'  => null,
+         ],
+         [
+            'cnx_string'        => '{mail.domain.org/imap}',
+            'expected_type'     => 'imap',
+            'expected_protocol' => \Laminas\Mail\Protocol\Imap::class,
+            'expected_storage'  => \Laminas\Mail\Storage\Imap::class,
+         ],
+         [
+            'cnx_string'        => '{mail.domain.org/imap/ssl/debug}INBOX',
+            'expected_type'     => 'imap',
+            'expected_protocol' => \Laminas\Mail\Protocol\Imap::class,
+            'expected_storage'  => \Laminas\Mail\Storage\Imap::class,
+         ],
+         [
+            'cnx_string'        => '{mail.domain.org/pop}',
+            'expected_type'     => 'pop',
+            'expected_protocol' => \Laminas\Mail\Protocol\Pop3::class,
+            'expected_storage'  => \Laminas\Mail\Storage\Pop3::class,
+         ],
+         [
+            'cnx_string'        => '{mail.domain.org/pop/ssl/tls}',
+            'expected_type'     => 'pop',
+            'expected_protocol' => \Laminas\Mail\Protocol\Pop3::class,
+            'expected_storage'  => \Laminas\Mail\Storage\Pop3::class,
+         ],
+         [
+            'cnx_string'        => '{mail.domain.org/unknown-type/ssl}',
+            'expected_type'     => '',
+            'expected_protocol' => null,
+            'expected_storage'  => null,
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider mailServerProtocolsProvider
+    */
+   public function testGetMailServerProtocols(
+      string $cnx_string,
+      string $expected_type,
+      ?string $expected_protocol,
+      ?string $expected_storage
+   ) {
+      $type = \Toolbox::parseMailServerConnectString($cnx_string)['type'];
+
+      $this->string($type)->isEqualTo($expected_type);
+
+      if ($expected_protocol !== null) {
+         $this->object(\Toolbox::getMailServerProtocolInstance($type))->isInstanceOf($expected_protocol);
+      } else {
+         $this->variable(\Toolbox::getMailServerProtocolInstance($type))->isNull();
+      }
+
+      $params = [
+         'host'     => 'dovecot',
+         'user'     => 'testuser',
+         'password' => 'applesauce',
+      ];
+      if ($expected_storage !== null) {
+         $this->object(\Toolbox::getMailServerStorageInstance($type, $params))->isInstanceOf($expected_storage);
+      } else {
+         $this->variable(\Toolbox::getMailServerStorageInstance($type, $params))->isNull();
+      }
+   }
+
+
+   protected function mailServerProtocolsHookProvider() {
+      // Create valid classes
+      eval(<<<CLASS
+class PluginTesterFakeProtocol implements Glpi\Mail\Protocol\ProtocolInterface {
+   public function setNoValidateCert(bool \$novalidatecert) {}
+   public function connect(\$host, \$port = null, \$ssl = false) {}
+   public function login(\$user, \$password) {}
+}
+class PluginTesterFakeStorage extends Laminas\Mail\Storage\Imap {
+   public function __construct(\$params) {}
+   public function close() {}
+}
+CLASS
+      );
+
+      return [
+         // Check that invalid hook result does not alter core protocols specs
+         [
+            'hook_result'        => 'invalid result',
+            'type'               => 'imap',
+            'expected_warning'   => 'Invalid value returned by "mail_server_protocols" hook.',
+            'expected_protocol'  => 'Laminas\Mail\Protocol\Imap',
+            'expected_storage'   => 'Laminas\Mail\Storage\Imap',
+         ],
+         // Check that hook cannot alter core protocols specs
+         [
+            'hook_result'        => [
+               'imap' => [
+                  'label'    => 'Override test',
+                  'protocol' => 'SomeClass',
+                  'storage'  => 'SomeClass',
+               ],
+            ],
+            'type'               => 'imap',
+            'expected_warning'   => 'Protocol "imap" is already defined and cannot be overwritten.',
+            'expected_protocol'  => 'Laminas\Mail\Protocol\Imap',
+            'expected_storage'   => 'Laminas\Mail\Storage\Imap',
+         ],
+         // Check that hook cannot alter core protocols specs
+         [
+            'hook_result'        => [
+               'pop' => [
+                  'label'    => 'Override test',
+                  'protocol' => 'SomeClass',
+                  'storage'  => 'SomeClass',
+               ],
+            ],
+            'type'               => 'pop',
+            'expected_warning'   => 'Protocol "pop" is already defined and cannot be overwritten.',
+            'expected_protocol'  => 'Laminas\Mail\Protocol\Pop3',
+            'expected_storage'   => 'Laminas\Mail\Storage\Pop3',
+         ],
+         // Check that class must exists
+         [
+            'hook_result'        => [
+               'custom-protocol' => [
+                  'label'    => 'Invalid class',
+                  'protocol' => 'SomeClass1',
+                  'storage'  => 'SomeClass2',
+               ],
+            ],
+            'type'               => 'custom-protocol',
+            'expected_warning'   => 'Invalid specs for protocol "custom-protocol".',
+            'expected_protocol'  => null,
+            'expected_storage'   => null,
+         ],
+         // Check that class must implements expected functions
+         [
+            'hook_result'        => [
+               'custom-protocol' => [
+                  'label'    => 'Invalid class',
+                  'protocol' => 'Plugin',
+                  'storage'  => 'Migration',
+               ],
+            ],
+            'type'               => 'custom-protocol',
+            'expected_warning'   => 'Invalid specs for protocol "custom-protocol".',
+            'expected_protocol'  => null,
+            'expected_storage'   => null,
+         ],
+         // Check valid case using class names
+         [
+            'hook_result'        => [
+               'custom-protocol' => [
+                  'label'    => 'Custom email protocol',
+                  'protocol' => 'PluginTesterFakeProtocol',
+                  'storage'  => 'PluginTesterFakeStorage',
+               ],
+            ],
+            'type'               => 'custom-protocol',
+            'expected_warning'   => null,
+            'expected_protocol'  => 'PluginTesterFakeProtocol',
+            'expected_storage'   => 'PluginTesterFakeStorage',
+         ],
+         // Check valid case using callback
+         [
+            'hook_result'        => [
+               'custom-protocol' => [
+                  'label'    => 'Custom email protocol',
+                  'protocol' => function () { return new \PluginTesterFakeProtocol(); },
+                  'storage'  => function (array $params) { return new \PluginTesterFakeStorage($params); },
+               ],
+            ],
+            'type'               => 'custom-protocol',
+            'expected_warning'   => null,
+            'expected_protocol'  => 'PluginTesterFakeProtocol',
+            'expected_storage'   => 'PluginTesterFakeStorage',
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider mailServerProtocolsHookProvider
+    */
+   public function testGetAdditionnalMailServerProtocols(
+      $hook_result,
+      string $type,
+      ?string $expected_warning,
+      ?string $expected_protocol,
+      ?string $expected_storage
+   ) {
+      global $PLUGIN_HOOKS;
+
+      $hooks_backup = $PLUGIN_HOOKS;
+
+      $PLUGIN_HOOKS['mail_server_protocols']['tester'] = function () use ($hook_result) {
+         return $hook_result;
+      };
+
+      // Get protocol
+      $protocol  = null;
+      $getProtocol = function () use ($type, &$protocol) {
+         $protocol = \Toolbox::getMailServerProtocolInstance($type);
+      };
+      if ($expected_warning !== null) {
+         $this->when($getProtocol)
+            ->error()
+            ->withType(E_USER_WARNING)
+            ->withMessage($expected_warning)
+            ->exists();
+      } else {
+         $getProtocol();
+      }
+
+      // Get storage
+      $storage   = null;
+      $getStorage = function () use ($type, &$storage) {
+         $params = [
+            'host'     => 'dovecot',
+            'user'     => 'testuser',
+            'password' => 'applesauce',
+         ];
+         $storage = \Toolbox::getMailServerStorageInstance($type, $params);
+      };
+      if ($expected_warning !== null) {
+         $this->when($getStorage)
+         ->error()
+         ->withType(E_USER_WARNING)
+         ->withMessage($expected_warning)
+         ->exists();
+      } else {
+         $getStorage();
+      }
+
+      $PLUGIN_HOOKS = $hooks_backup;
+
+      if ($expected_protocol !== null) {
+         $this->object($protocol)->isInstanceOf($expected_protocol);
+      } else {
+         $this->variable($protocol)->isNull();
+      }
+
+      if ($expected_storage !== null) {
+         $this->object($storage)->isInstanceOf($expected_storage);
+      } else {
+         $this->variable($storage)->isNull();
+      }
    }
 }

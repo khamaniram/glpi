@@ -1076,7 +1076,7 @@ class CommonDBTM extends CommonGLPI {
       }
 
       // This means we are not adding a cloned object
-      if (!isset($input['clone'])) {
+      if (!Toolbox::hasTrait($this, \Glpi\Features\Clonable::class) || !isset($input['clone'])) {
          // This means we are asked to clone the object (old way). This will clone the clone method
          // that will set the clone parameter to true
          if (isset($input['_oldID'])) {
@@ -1224,10 +1224,12 @@ class CommonDBTM extends CommonGLPI {
     * @param boolean $history do history log ? (true by default)
     *
     * @return integer the new ID of the clone (or false if fail)
+    * @deprecated x.x.x Use the {@link \Glpi\Features\Clonable} trait instead
     */
    function clone(array $override_input = [], bool $history = true) {
       global $DB, $CFG_GLPI;
 
+      \Toolbox::deprecated();
       if ($DB->isSlave()) {
          return false;
       }
@@ -1397,8 +1399,10 @@ class CommonDBTM extends CommonGLPI {
     * @param array $input datas used to add the item
     *
     * @return array the modified $input array
+    * @deprecated x.x.x Use the {@link \Glpi\Features\Clonable} trait
    **/
    function prepareInputForClone($input) {
+      \Toolbox::deprecated();
       unset($input['id']);
       unset($input['date_mod']);
       unset($input['date_creation']);
@@ -1423,8 +1427,10 @@ class CommonDBTM extends CommonGLPI {
     * @param $history do history log ?
     *
     * @return void
+    * @deprecated x.x.x Use the {@link \Glpi\Features\Clonable} trait
    **/
    function post_clone($source, $history) {
+      \Toolbox::deprecated();
    }
 
 
@@ -5406,6 +5412,19 @@ class CommonDBTM extends CommonGLPI {
          $ruleasset          = new RuleAssetCollection();
          $input              = $this->input;
          $input['_itemtype'] = $this->getType();
+
+         $user = new User();
+         if (isset($input["users_id"]) && $input["users_id"] != 0
+             && $user->getFromDB($input["users_id"])) {
+            $group_user  = new Group_User();
+            $groups_user = $group_user->find(['users_id' => $input["users_id"]]);
+            $input['_groups_id_of_user'] = [];
+            foreach ($groups_user as $group) {
+               $input['_groups_id_of_user'][] = $group['groups_id'];
+            }
+            $input['_locations_id_of_user']      = $user->fields['locations_id'];
+            $input['_default_groups_id_of_user'] = $user->fields['groups_id'];
+         }
 
          //If _auto is not defined : it's a manual process : set it's value to 0
          if (!isset($this->input['_auto'])) {

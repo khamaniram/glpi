@@ -47,15 +47,16 @@ function update95toXX() {
    $migration->setVersion('x.x.x');
 
    $update_scripts = [
-      'comment_fields',
       'devicebattery',
       'documents',
       'domains',
       'native_inventory',
       'recurrentchange',
       'reservationitem',
+      'schema_fixes',
       'softwares',
       'uuids',
+      'inventory_management'
    ];
 
    foreach ($update_scripts as $update_script) {

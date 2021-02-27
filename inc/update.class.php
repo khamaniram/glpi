@@ -37,7 +37,7 @@ if (!defined('GLPI_ROOT')) {
 /**
  *  Update class
 **/
-class Update extends CommonGLPI {
+class Update {
    private $args = [];
    private $DB;
    private $migration;
@@ -368,6 +368,9 @@ class Update extends CommonGLPI {
             update952to953();
 
          case "9.5.3":
+            include_once "{$updir}update_953_954.php";
+            update953to954();
+
          case "9.5.4":
          case "9.5.5":
          case "9.5.6":

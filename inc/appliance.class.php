@@ -240,6 +240,8 @@ class Appliance extends CommonDBTM {
          'datatype'      =>  'text'
       ];
 
+      $tab = array_merge($tab, Location::rawSearchOptionsToAdd());
+
       $tab[] = [
          'id'            => '5',
          'table'         =>  Appliance_Item::getTable(),
@@ -266,6 +268,14 @@ class Appliance extends CommonDBTM {
          'field'         => 'completename',
          'name'          => Group::getTypeName(1),
          'condition'     => ['is_itemgroup' => 1],
+         'datatype'      => 'dropdown'
+      ];
+
+      $tab[] = [
+         'id'            => '23',
+         'table'         => 'glpi_manufacturers',
+         'field'         => 'name',
+         'name'          => Manufacturer::getTypeName(1),
          'datatype'      => 'dropdown'
       ];
 
@@ -310,7 +320,7 @@ class Appliance extends CommonDBTM {
          'id'            => '11',
          'table'         => ApplianceType::getTable(),
          'field'         => 'name',
-         'name'          => __('Type'),
+         'name'          => _n('Type', 'Types', 1),
          'datatype'      => 'dropdown'
       ];
 
@@ -382,6 +392,56 @@ class Appliance extends CommonDBTM {
 
       return $tab;
    }
+
+
+   public static function rawSearchOptionsToAdd(string $itemtype) {
+      $tab = [];
+
+      $tab[] = [
+         'id' => 'appliance',
+         'name' => self::getTypeName(Session::getPluralNumber())
+      ];
+
+      $tab[] = [
+         'id'                 => '1210',
+         'table'              => self::getTable(),
+         'field'              => 'name',
+         'name'               => __('Name'),
+         'forcegroupby'       => true,
+         'datatype'           => 'itemlink',
+         'itemlink_type'      => 'Appliance',
+         'massiveaction'      => false,
+         'joinparams'         => [
+            'beforejoin' => [
+               'table'      => Appliance_Item::getTable(),
+               'joinparams' => ['jointype' => 'itemtype_item']
+            ]
+         ]
+      ];
+
+      $tab[] = [
+         'id'                 => '1211',
+         'table'              => ApplianceType::getTable(),
+         'field'              => 'name',
+         'name'               => ApplianceType::getTypeName(1),
+         'forcegroupby'       => true,
+         'massiveaction'      => false,
+         'joinparams'         => [
+            'beforejoin' => [
+               'table'      => Appliance::getTable(),
+               'joinparams' => [
+                  'beforejoin' => [
+                     'table'      => Appliance_Item::getTable(),
+                     'joinparams' => ['jointype' => 'itemtype_item']
+                  ]
+               ]
+            ]
+         ]
+      ];
+
+      return $tab;
+   }
+
 
    function cleanDBonPurge() {
 
